@@ -11,6 +11,14 @@ from lm_eval.evaluator import Evaluator
 from lm_eval.tasks import ALL_TASKS
 from lm_eval.utils import TikTokenTokenizer
 
+
+
+TIKTOKEN_ENCODINGS_LIST = [
+    "cl100k_base",
+    "p50k_base",
+    "r50k_base"
+]
+
 class MultiChoice:
     def __init__(self, choices):
         self.choices = choices
@@ -35,6 +43,11 @@ def parse_args():
         "--model",
         default="codeparrot/codeparrot-small",
         help="Model to evaluate, provide a repo name in Hugging Face hub or a local path",
+    )
+    parser.add_argument(
+        "--tokenizer",
+        default="cl100k_base",
+        help="Tokenizer to use, provide a repo name in Hugging Face hub or a local path"
     )
     parser.add_argument(
         "--revision",
@@ -157,12 +170,15 @@ def main():
             trust_remote_code=args.trust_remote_code,
             use_auth_token=args.use_auth_token,
         )
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.model,
-            revision=args.revision,
-            use_auth_token=args.use_auth_token,
-            truncation_side="left",
-        )
+        if args.tokenizer not in TIKTOKEN_ENCODINGS_LIST:
+            tokenizer = AutoTokenizer.from_pretrained(
+                args.model,
+                revision=args.revision,
+                use_auth_token=args.use_auth_token,
+                truncation_side="left",
+            )
+        else:
+            tokenizer = TikTokenTokenizer(args.tokenizer,"left")
         if not tokenizer.eos_token:
             if tokenizer.bos_token:
                 tokenizer.eos_token = tokenizer.bos_token
