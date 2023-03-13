@@ -5,8 +5,46 @@ import warnings
 import torch
 from torch.utils.data import IterableDataset
 from tqdm import tqdm
+import tiktoken
 
 INFILL_MODE = False
+
+class TikTokenTokenizer:
+    def __init__(self, tokenizer_name : str):
+        self.tokenizer_base = tiktoken.get_encoding(tokenizer_name)
+        self.pad_token_id = self.tokenizer_base.max_token_value + 1
+
+    def __call__(self,
+            prompts,
+            padding:bool,
+            truncation:bool,
+            return_tensors:str,
+            max_length:int=None,
+            return_token_type_ids:bool=None
+        ):
+        if return_tensors == "pt":
+            input_ids_without_pad = self.tokenizer_base.encode_batch(prompts)#[self.tokenizer_base.encode(prompt) for prompt in prompts]
+            attention_mask = [[1] * len(ids) for ids in input_ids_without_pad]
+            print(input_ids_without_pad)
+            if truncation:
+                if max_length is None:
+                    raise ValueError("max_length must be specified when truncation is True")
+                input_ids_without_pad = [ids[:max_length] for ids in input_ids_without_pad]
+                attention_mask = [mask[:max_length] for mask in attention_mask]
+            if padding:
+                if max_length is None:
+                    raise ValueError("max_length must be specified when padding is True")
+                input_ids_without_pad = [ids + [self.pad_token_id] * (max_length - len(ids)) for ids in input_ids_without_pad]
+                attention_mask = [mask + [0] * (max_length - len(mask)) for mask in attention_mask]
+            input_ids = torch.LongTensor(input_ids_without_pad)
+            attention_mask = torch.LongTensor(attention_mask)
+            return {"input_ids": input_ids, "attention_mask": attention_mask}
+        else:
+            raise NotImplementedError("Only pytorch tensors are supported")
+        
+    def decode(self, input_ids, skip_special_tokens=False, clean_up_tokenization_spaces=False):
+
+        return [self.tokenizer_base.decode([i for i in input_id.tolist() if i != self.pad_token_id]) for input_id in input_ids]
 
 
 class TokenizedDataset(IterableDataset):
@@ -190,3 +228,14 @@ def complete_code(
                 code_gens[sample].append(gen_code[len(prefix) :])
 
     return code_gens
+
+
+if __name__ == "__main__":
+    def test_tiktoken_tokenizer():
+        trial_code_batch = ["Hello, this is a test code", "This is another test code"]
+        tiktoken_tokenizer = TikTokenTokenizer("cl100k_base")
+        tokenized = tiktoken_tokenizer(trial_code_batch, return_tensors="pt",padding=True, truncation=True, max_length=20)
+        print(tokenized)
+        print(trial_code_batch)
+        print(tiktoken_tokenizer.decode(tokenized["input_ids"]))
+        assert tiktoken_tokenizer.decode(tokenized["input_ids"]) == trial_code_batch
