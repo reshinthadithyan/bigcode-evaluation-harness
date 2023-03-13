@@ -10,9 +10,10 @@ import tiktoken
 INFILL_MODE = False
 
 class TikTokenTokenizer:
-    def __init__(self, tokenizer_name : str):
+    def __init__(self, tokenizer_name : str,truncation_side="right"):
         self.tokenizer_base = tiktoken.get_encoding(tokenizer_name)
         self.pad_token_id = self.tokenizer_base.max_token_value + 1
+        self.truncation_side = truncation_side
 
     def __call__(self,
             prompts,
@@ -29,8 +30,14 @@ class TikTokenTokenizer:
             if truncation:
                 if max_length is None:
                     raise ValueError("max_length must be specified when truncation is True")
-                input_ids_without_pad = [ids[:max_length] for ids in input_ids_without_pad]
-                attention_mask = [mask[:max_length] for mask in attention_mask]
+                if self.truncation_side == "right":
+                    input_ids_without_pad = [ids[:max_length] for ids in input_ids_without_pad]
+                    attention_mask = [mask[:max_length] for mask in attention_mask]
+                elif self.truncation_side == "left":
+                    input_ids_without_pad = [ids[-max_length:] for ids in input_ids_without_pad]
+                    attention_mask = [mask[-max_length:] for mask in attention_mask]
+                else:
+                    raise ValueError("truncation_side must be either 'right' or 'left'")
             if padding:
                 if max_length is None:
                     raise ValueError("max_length must be specified when padding is True")
@@ -233,7 +240,7 @@ def complete_code(
 if __name__ == "__main__":
     def test_tiktoken_tokenizer():
         trial_code_batch = ["Hello, this is a test code", "This is another test code"]
-        tiktoken_tokenizer = TikTokenTokenizer("cl100k_base")
+        tiktoken_tokenizer = TikTokenTokenizer("cl100k_base","left")
         tokenized = tiktoken_tokenizer(trial_code_batch, return_tensors="pt",padding=True, truncation=True, max_length=20)
         print(tokenized)
         print(trial_code_batch)

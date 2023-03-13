@@ -9,7 +9,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
 from lm_eval.arguments import EvalArguments
 from lm_eval.evaluator import Evaluator
 from lm_eval.tasks import ALL_TASKS
-
+from lm_eval.utils import TikTokenTokenizer
 
 class MultiChoice:
     def __init__(self, choices):
